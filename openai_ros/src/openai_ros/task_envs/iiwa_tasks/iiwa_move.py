@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+# Task iiwa environment. Create the world and the action
+
 import rospy
 import numpy
 from gym import spaces
@@ -44,6 +46,15 @@ class iiwaMoveEnv(iiwa_env.iiwaEnv):
         # Variables of the class
         self.cumulated_reward = 0.0
 
+        # TARGET
+        target_x = 0.5
+        target_y = 0.5
+        target_z = 0.5
+        target_position = []
+        target_position.append(target_x)
+        target_position.append(target_y)
+        target_position.append(target_z)
+
         # Here we will add any init functions prior to starting the MyRobotEnv
         # super(iiwaMoveEnv, self).__init__(ros_ws_abspath)
         super(iiwaMoveEnv, self).__init__()
@@ -59,12 +70,12 @@ class iiwaMoveEnv(iiwa_env.iiwaEnv):
         Sets the Robot in its init linear and angular speeds
         and lands the robot. Its preparing it to be reseted in the world.
         """
-
+        rospy.logdebug("Start Set Initi Joints")
         joints_array = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-
-        self.move_iiwa_joints(joints_array)
-
-        return True
+        rospy.logdebug("Set Init Joints ==> " + str(joints_array))
+        result = self.set_joint_action(joints_array)
+        rospy.logdebug("Set Init Joints Works!")
+        return result
 
     def _init_env_variables(self):
         """
@@ -76,6 +87,10 @@ class iiwaMoveEnv(iiwa_env.iiwaEnv):
         # For Info Purposes
         self.cumulated_reward = 0.0
 
+    # The action here are the delta for the 6 first row
+    # The delta position are in m
+    # The angle are in Euler in rad 
+    # action = [ x, y, z, R, P, Y ]
     def _set_action(self, action):
         """
         It sets the joints of monoped based on the action integer given
@@ -83,11 +98,20 @@ class iiwaMoveEnv(iiwa_env.iiwaEnv):
         :param action: The action integer that sets what movement to do next.
         """
 
-        rospy.logdebug("Start Set Action ==>"+str(action))
-
-        # joints_array = [0.0, 0.55, 0.0, 0.77, 0.0, 0.0, 0.0]
+        rospy.logdebug("Start Set Action ==>" + str(action))
 
         # self.move_iiwa_joints(action)
+        kuka_pose = []
+        # for i in range(0,6):
+        kuka_pose.append(action[0])
+        kuka_pose.append(action[1])
+        kuka_pose.append(action[2])
+        kuka_pose.append(action[3])
+        kuka_pose.append(action[4])
+        kuka_pose.append(action[5])
+
+        print(kuka_pose)
+        self.set_endEffector_acttionToPose(kuka_pose)
         
 
         rospy.logdebug("END Set Action ==>"+str(action))
@@ -97,8 +121,17 @@ class iiwaMoveEnv(iiwa_env.iiwaEnv):
         
         """
         rospy.logdebug("Start Get Observation ==>")
-
+        get_obs_pose = self.get_endEffector_Object()
         observation = []
+        
+        observation.append(get_obs_pose.position.x)
+        observation.append(get_obs_pose.position.y)
+        observation.append(get_obs_pose.position.z)
+        observation.append(get_obs_pose.orientation.x)
+        observation.append(get_obs_pose.orientation.y)
+        observation.append(get_obs_pose.orientation.z)
+        observation.append(get_obs_pose.orientation.w)
+
 
         return observation
 
@@ -108,7 +141,8 @@ class iiwaMoveEnv(iiwa_env.iiwaEnv):
         """
 
         # TODO
-        done = True
+        done = False
+        if ()
 
         return done
 
@@ -128,20 +162,10 @@ class iiwaMoveEnv(iiwa_env.iiwaEnv):
 
     # Internal TaskEnv Methods
 
-    def is_in_desired_position(self, current_position, epsilon=0.05):
+    def calculate_distance_between(self, v1, v2):
         """
-        n
+        Calculated the Euclidian distance between two vectors given as python lists.
         """
-
-        is_in_desired_pos = False
-
-        return is_in_desired_pos
-
-    def is_inside_workspace(self, current_position):
-        """
-        
-        """
-        is_inside = False
-
-        return is_inside
+        dist = np.linalg.norm(np.array(v1)-np.array(v2))
+        return dist
 
