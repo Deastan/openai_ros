@@ -142,7 +142,7 @@ class iiwaMoveEnv(iiwa_env.iiwaEnv):
 
         # TODO
         done = False
-        if ()
+        # if ()
 
         return done
 
