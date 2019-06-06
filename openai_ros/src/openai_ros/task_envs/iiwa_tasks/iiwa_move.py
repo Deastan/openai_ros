@@ -1,9 +1,9 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 # Task iiwa environment. Create the world and the action
 
 import rospy
-import numpy
+import numpy as np
 from gym import spaces
 from openai_ros.robot_envs import iiwa_env
 from gym.envs.registration import register
@@ -47,13 +47,21 @@ class iiwaMoveEnv(iiwa_env.iiwaEnv):
         self.cumulated_reward = 0.0
 
         # TARGET
-        target_x = 0.5
-        target_y = 0.5
-        target_z = 0.5
-        target_position = []
-        target_position.append(target_x)
-        target_position.append(target_y)
-        target_position.append(target_z)
+        target_x = 0.5#0.0#0.5
+        target_y = 0.5#0.5
+        target_z = 0.5#0.5
+        self.target_position = []
+        self.target_position.append(target_x)
+        self.target_position.append(target_y)
+        self.target_position.append(target_z)
+        # Last position
+        self.last_pose = [] #this is a pose
+        self.last_observation = []
+        # Current position
+        self.current_pose = []
+        self.current_observation = []
+        # Movement result: True movement is done, false means the robot did't move
+        self.movement_result = False
 
         # Here we will add any init functions prior to starting the MyRobotEnv
         # super(iiwaMoveEnv, self).__init__(ros_ws_abspath)
@@ -86,6 +94,8 @@ class iiwaMoveEnv(iiwa_env.iiwaEnv):
 
         # For Info Purposes
         self.cumulated_reward = 0.0
+        self.last_pose = self.get_endEffector_Object()
+        self.current_pose = self.get_endEffector_Object()
 
     # The action here are the delta for the 6 first row
     # The delta position are in m
@@ -111,38 +121,71 @@ class iiwaMoveEnv(iiwa_env.iiwaEnv):
         kuka_pose.append(action[5])
 
         print(kuka_pose)
-        self.set_endEffector_acttionToPose(kuka_pose)
+        self.movement_result = self.set_endEffector_acttionToPose(kuka_pose)
+        if self.movement_result == False:
+            print("*******************************************************")
+            print("COULD NOT MOVE")
+            print("*******************************************************")
+        else:
+            print("*******************************************************")
+            print("COULD MOVED")
+            print("*******************************************************")
+
         
 
         rospy.logdebug("END Set Action ==>"+str(action))
 
+    # An observation is a vector with 7 rows which containing 
+    # the pose of the hand effector
+    # (x, y, z, quat.x, quat.y, quat.z, quat.w)
     def _get_obs(self):
         """
         
         """
-        rospy.logdebug("Start Get Observation ==>")
-        get_obs_pose = self.get_endEffector_Object()
+        # rospy.logdebug("Start Get Observation ==>")
+        self.last_pose = self.current_pose
+
+        last_observation = []     
+        last_observation.append(self.current_pose.position.x)
+        last_observation.append(self.current_pose.position.y)
+        last_observation.append(self.current_pose.position.z)
+        last_observation.append(self.current_pose.orientation.x)
+        last_observation.append(self.current_pose.orientation.y)
+        last_observation.append(self.current_pose.orientation.z)
+        last_observation.append(self.current_pose.orientation.w)
+
+        self.last_observation = last_observation
+        # get_obs_pose = self.get_endEffector_Object()
+        self.current_pose = self.get_endEffector_Object()
         observation = []
         
-        observation.append(get_obs_pose.position.x)
-        observation.append(get_obs_pose.position.y)
-        observation.append(get_obs_pose.position.z)
-        observation.append(get_obs_pose.orientation.x)
-        observation.append(get_obs_pose.orientation.y)
-        observation.append(get_obs_pose.orientation.z)
-        observation.append(get_obs_pose.orientation.w)
+        observation.append(self.current_pose.position.x)
+        observation.append(self.current_pose.position.y)
+        observation.append(self.current_pose.position.z)
+        observation.append(self.current_pose.orientation.x)
+        observation.append(self.current_pose.orientation.y)
+        observation.append(self.current_pose.orientation.z)
+        observation.append(self.current_pose.orientation.w)
 
-
+        # Update observation 
+        self.current_observation = observation
         return observation
 
+    # Check if the goal is reached or not
     def _is_done(self, observations):
         """
         
         """
 
-        # TODO
         done = False
-        # if ()
+        vector_observ_pose = []
+        vector_observ_pose.append(observations[0])
+        vector_observ_pose.append(observations[1])
+        vector_observ_pose.append(observations[2])
+
+        # Check if the hand effector is close to the target in cm!
+        if self.distance_between_vectors(vector_observ_pose, self.target_position) < 0.03:
+            done = True
 
         return done
 
@@ -153,6 +196,37 @@ class iiwaMoveEnv(iiwa_env.iiwaEnv):
 
         # The sign depend on its function.
         total_reward = 0
+        
+        # create and update from last position
+        last_position = []
+        last_position.append(self.last_pose.position.x)
+        last_position.append(self.last_pose.position.y)
+        last_position.append(self.last_pose.position.z)
+
+        # create and update current position
+        current_position = []
+        current_position.append(self.current_pose.position.x)
+        current_position.append(self.current_pose.position.y)
+        current_position.append(self.current_pose.position.z)
+
+        # create the distance btw the two last vector
+        distance_before_move = self.distance_between_vectors(last_position, self.target_position)
+        distance_after_move = self.distance_between_vectors(current_position, self.target_position)
+
+        # Give the reward
+        if done:
+            total_reward += 100
+        else:
+            if(distance_after_move - distance_before_move > 0):
+                print("right direction")
+                total_reward += 1.0
+            else:
+                print("wrong direction")
+                total_reward -= 0.5
+
+        # Time punishment
+        total_reward -= 0.5
+
 
         rospy.logdebug("###############")
         rospy.logdebug("total_reward=" + str(total_reward))
@@ -160,12 +234,14 @@ class iiwaMoveEnv(iiwa_env.iiwaEnv):
 
         return total_reward
 
-    # Internal TaskEnv Methods
+    # Internal TaskEnv Methods To be far from GYM 
 
-    def calculate_distance_between(self, v1, v2):
+    # Calculates the distance btw two position vectors
+    def distance_between_vectors(self, v1, v2):
         """
-        Calculated the Euclidian distance between two vectors given as python lists.
         """
-        dist = np.linalg.norm(np.array(v1)-np.array(v2))
+        dist = np.linalg.norm(np.array(v1) - np.array(v2))
         return dist
-
+    
+    def calculate_reward(self):
+        print("Albus")

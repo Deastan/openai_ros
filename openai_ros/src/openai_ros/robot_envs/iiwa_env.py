@@ -18,7 +18,7 @@ import rospkg
 
 #moveit
 import moveit_commander
-from moveit_commander.conversions import pose_to_list
+# from moveit_commander.conversions import pose_to_list
 
 # msg
 import geometry_msgs.msg
@@ -174,6 +174,9 @@ class iiwaEnv(robot_gazebo_env.RobotGazeboEnv):
         # rospy.sleep(20)
         # Create instance for moveIt
         self.moveit_object = MoveIiwa()
+
+        # We pause until the next step
+        self.gazebo.pauseSim()
         
        
     # Methods needed by the RobotGazeboEnv
@@ -237,9 +240,14 @@ class iiwaEnv(robot_gazebo_env.RobotGazeboEnv):
         pose_goal.orientation.z = q_interm[2]
         pose_goal.orientation.w = q_interm[3]
         # pose_goal.orientation =  q_mult(q_rot, current_pose.orientation)
+        
+        # result = self.moveit_object.set_endEffector_pose(pose_goal)
+        result = self.moveit_object.set_endEffector_pose_v2(pose_goal)
 
-        result = self.moveit_object.set_endEffector_pose(pose_goal)
-
+        #V2
+        # 
+        # result = self.moveit_object.set_endEffector_pose_v2(action)
+        
         return result
     
     # TODO CREATE THIS FUNCTION
@@ -317,7 +325,25 @@ class MoveIiwa(object):
         self.group_name = "manipulator"
         self.group = moveit_commander.MoveGroupCommander(self.group_name)
         rospy.logdebug("MoveGroupCommander for arm initialised...DONE")
-
+        # self.group.get_goal_tolerance()
+        # self.group.set_goal_tolerance(0.1)
+        # self.group.set_planner_id("SBLkConfigDefault")
+        # self.group.set_planner_id("PRMkConfigDefault")
+        self.group.set_planner_id("RRTkConfigDefault")
+        # self.group.set_planner_id("RRTConnectkConfigDefault")
+        
+        self.group.set_planning_time(5.0)
+        self.group.allow_replanning(True)
+        # Set a box arround the robot
+        self.group.set_workspace([-1.0, -1.0, 0.0, 1.0, 1.0, 1.27])
+        
+        # self.group.set_planner_id("RRTConnectkConfigDefault")
+        self.group.set_goal_tolerance(0.05)
+        # self.group.set_num_planning_attempts(15) # USEFUL to calculate many trajectories calculation
+        # self.group.set_planning_time(5.0)
+        self.group.set_max_velocity_scaling_factor(1.0)
+        self.group.set_max_acceleration_scaling_factor(1.0)
+        
         # #GET INFO
         # planning_frame = self.group.get_planning_frame()
         # print "============ Reference frame: %s" % planning_frame
@@ -360,15 +386,27 @@ class MoveIiwa(object):
 
     # Plan and Execute the trajectory planed for a given cartesian pose
     def execute_trajectory(self):
+        result = False
         self.plan = self.group.plan()
-        result = self.group.go(wait=True)
+        # print(self.plan)
+        # rospy.sleep(6.0)
+        # print(self.plan)
+        # self.group.get_planning_time
+        # result = self.group.go(wait=True)
+        result =  self.group.execute(self.plan, wait=True)
+        # rospy.sleep(1.0)
+        print("in iiwa_env.py: class: MoveIiwa ")
+        print("execute_trajectory(): result: ", result)
+        # for i in range(0,50):
+        #     print("execute_trajectory(): result: ", result)
 
-        self.group.stop()
+        # rospy.sleep(self.group.get_planning_time())
+        
+        # self.group.stop()
         # It is always good to clear your targets after planning with poses.
         # Note: there is no equivalent function for clear_joint_value_targets()
-        self.group.clear_pose_targets()
-
-
+        # self.group.clear_pose_targets()
+        
         return result
     
     def get_endEffector_pose(self):
@@ -381,3 +419,18 @@ class MoveIiwa(object):
         rospy.logdebug("EE POSE==>"+str(endEffector_pose))
 
         return endEffector_pose
+
+        # TRY TWO
+    def set_endEffector_pose_v2(self, pose):
+        # self.group.shift_pose_target(5, action)
+        self.group.set_pose_target(pose)
+        # result = self.execute_trajectory()
+        self.plan = self.group.plan()
+        result =  self.group.execute(self.plan, wait=True)
+        rospy.sleep(0.05)
+        # print("in iiwa_env.py: class: MoveIiwa ")
+        # print("execute_trajectory(): result: ", result)
+
+        
+
+        return result
