@@ -117,7 +117,7 @@ class iiwaEnv(robot_gazebo_env.RobotGazeboEnv):
 
         self.robot_name_space = "iiwa"
 
-        self.reset_controls_bool = True
+        self.reset_controls_bool = False
         
         # We launch the init function of the Parent Class robot_gazebo_env.RobotGazeboEnv
         
@@ -129,7 +129,7 @@ class iiwaEnv(robot_gazebo_env.RobotGazeboEnv):
                                              robot_name_space=self.robot_name_space,
                                              reset_controls=self.reset_controls_bool,
                                              start_init_physics_parameters=False,# instead if false
-                                             reset_world_or_sim="WORLD")
+                                             reset_world_or_sim="WORLD")#"SIMULATION")
         # super(iiwaEnv, self).__init__()
 
         self.gazebo.unpauseSim()
@@ -140,7 +140,7 @@ class iiwaEnv(robot_gazebo_env.RobotGazeboEnv):
 
         # We pause until the next step
         #self.gazebo.pauseSim()
-
+        self.out_workspace = False # if the robot is out of the workspace
 
         # Publisher iiwa
         # self.publishers_iiwa_array = []
@@ -188,6 +188,11 @@ class iiwaEnv(robot_gazebo_env.RobotGazeboEnv):
     # Set the joints
     def set_joint_action(self, joints_angle):
         result = self.moveit_object.set_joints_execute(joints_angle)
+        # print("USE FOR THE RESET")
+        # print("USE FOR THE RESET")
+        # print("USE FOR THE RESET")
+        # print("USE FOR THE RESET")
+        self.wait_joint(joints_angle)
 
         return result
 
@@ -196,15 +201,50 @@ class iiwaEnv(robot_gazebo_env.RobotGazeboEnv):
         # print("get end effector pose")
         self.gazebo.unpauseSim()
         intermed_pose = self.moveit_object.get_endEffector_pose().pose
-        self.gazebo.pauseSim()
+        # self.gazebo.pauseSim()
 
         return intermed_pose
     
-    
+    def check_workspace(self, pose):
+        '''
+        Check the workspace if we can reach the position or not...
+        Assumptions: Never go under z=0.2 (offset_z)
 
-    # Vector action is the delta position (m) and angle (rad)
-    # (x, y, z, R, P, Y)
+        Output: 
+                True if we can reach the position, False otherwise.
+        '''
+        # print("Check workplace")
+        result = False
+        x = pose.position.x
+        y = pose.position.y
+        z = pose.position.z
+        # print("x: ", x, ", y: ", y, ", z: ", z)
+        # quat = pose.orientation.x 
+        # pose.orientation.y
+        # pose.orientation.z
+        # pose.orientation.w 
+        
+        # Sphere parameters:
+        z0 = 0.34
+        offset_ee = 0.13
+        offset_z = 0.25
+        # print("Before check point")
+        # print("Calculation: ", ((x*x + y*y + (z-z0)*(z-z0)) < (0.8+offset_ee)*(0.8+offset_ee)))
+        if (((x*x + y*y + (z-z0)*(z-z0)) < (0.8+offset_ee)*(0.8+offset_ee)) 
+                and ((x*x + y*y + (z-z0)*(z-z0)) > 0.4*0.4) 
+                and z > offset_z):
+            result = True
+        else:
+            print("Check_workspace: Cannot go at this pose")
+            # self.reset()
+
+        return result
+
     def set_endEffector_acttionToPose(self, action):
+        '''
+        Vector action is the delta position (m) and angle (rad)
+        (x, y, z, R, P, Y)    
+        '''
         
         # Current pose of the hand effector
         current_pose = geometry_msgs.msg.Pose()
@@ -241,15 +281,106 @@ class iiwaEnv(robot_gazebo_env.RobotGazeboEnv):
         pose_goal.orientation.w = q_interm[3]
         # pose_goal.orientation =  q_mult(q_rot, current_pose.orientation)
         
-        # result = self.moveit_object.set_endEffector_pose(pose_goal)
-        result = self.moveit_object.set_endEffector_pose_v2(pose_goal)
 
-        #V2
-        # 
-        # result = self.moveit_object.set_endEffector_pose_v2(action)
+        # Check if point is in the workspace:
+        bool_check_workspace = self.check_workspace(pose_goal)
+        if bool_check_workspace == True:
+            # result = self.moveit_object.set_endEffector_pose(pose_goal)
+            result = self.moveit_object.set_endEffector_pose_v2(pose_goal)
+            self.wait(pose_goal)
+            # time.sleep(2.0)
+            # Shortcut the result from moveit 
+            result = True
+        else:
+            result = False
+        
+        return result
+
+    def set_endEffector_pose(self, action):
+        
+        # Current pose of the hand effector
+        # current_pose = geometry_msgs.msg.Pose()
+        # current_pose = self.moveit_object.get_endEffector_pose().pose
+
+        # euler to quaternion 
+        # R, P, Y = action[3], action[4], action[5]
+        q_rot = quaternion_from_euler(action[3], action[4], action[5])
+
+        # create pose msg
+        pose_goal = geometry_msgs.msg.Pose()
+        pose_goal.position.x = action[0]
+        pose_goal.position.y = action[1]
+        pose_goal.position.z = action[2]
+        pose_goal.orientation.x = q_rot[0]
+        pose_goal.orientation.y = q_rot[1]
+        pose_goal.orientation.z = q_rot[2]
+        pose_goal.orientation.w = q_rot[3]
+        print(pose_goal)
+        #check if point is in the workspace:
+        bool_check_workspace = self.check_workspace(pose_goal)
+        if bool_check_workspace == True:
+            # result = self.moveit_object.set_endEffector_pose(pose_goal)
+            result = self.moveit_object.set_endEffector_pose_v2(pose_goal)
+            self.wait(pose_goal)
+            # Shortcut the result from moveit 
+            result = True
+        else:
+            result = False
         
         return result
     
+    def wait(self, pose):
+        '''
+        Wait to reach the right position
+        '''
+        
+        result = False
+        i = 0
+        while not (result or i > 20):
+            current_pose = geometry_msgs.msg.Pose()
+            current_pose = self.moveit_object.get_endEffector_pose().pose
+            tolerence = 0.1
+            if (math.fabs(pose.position.x-current_pose.position.x) < tolerence 
+                    and math.fabs(pose.position.y-current_pose.position.y) < tolerence 
+                    and math.fabs(pose.position.z-current_pose.position.z) < tolerence):
+
+                result = True
+            else:
+                result = False
+                # print("WARNING: Weaiting to reach the right position!")
+            i+=1
+
+        return result
+
+    def wait_joint(self, joint):
+        '''
+        Wait to reach the right joints angle
+        '''
+        
+        result = False
+        i = 0
+        while not (result or i > 20):
+            # current_pose = geometry_msgs.msg.Pose()
+            # current_pose = self.moveit_object.get_endEffector_pose().pose
+            current_joint = self.moveit_object.get_joint()
+            tolerence = 0.05
+            # print(math.fabs(joint[0]-current_joint[0]))
+            if ((math.fabs(joint[0]-current_joint[0]) < tolerence)
+                    and (math.fabs(joint[1]-current_joint[1]) < tolerence)
+                    and (math.fabs(joint[2]-current_joint[2]) < tolerence)
+                    and (math.fabs(joint[3]-current_joint[3]) < tolerence)
+                    and (math.fabs(joint[4]-current_joint[4]) < tolerence)
+                    and (math.fabs(joint[5]-current_joint[5]) < tolerence)
+                    and (math.fabs(joint[6]-current_joint[6]) < tolerence)):
+                # print("WARNING: Wainting on joints angle")
+                result = True
+            else:
+                result = False
+                # print("WARNING: Weaiting to reach the right angles!")
+            i+=1
+        return result
+
+
     # TODO CREATE THIS FUNCTION
     def _check_all_systems_ready(self):
         """
@@ -335,14 +466,14 @@ class MoveIiwa(object):
         self.group.set_planning_time(5.0)
         self.group.allow_replanning(True)
         # Set a box arround the robot
-        self.group.set_workspace([-1.0, -1.0, 0.0, 1.0, 1.0, 1.27])
+        # self.group.set_workspace([-1.0, -1.0, 0.0, 1.0, 1.0, 1.27])
         
         # self.group.set_planner_id("RRTConnectkConfigDefault")
         self.group.set_goal_tolerance(0.05)
         # self.group.set_num_planning_attempts(15) # USEFUL to calculate many trajectories calculation
         # self.group.set_planning_time(5.0)
-        self.group.set_max_velocity_scaling_factor(1.0)
-        self.group.set_max_acceleration_scaling_factor(1.0)
+        self.group.set_max_velocity_scaling_factor(1.0)#0.8)#1.0)
+        self.group.set_max_acceleration_scaling_factor(1.0)#0.8)#1.0)
         
         # #GET INFO
         # planning_frame = self.group.get_planning_frame()
@@ -363,24 +494,38 @@ class MoveIiwa(object):
         # print ""
 
     def set_joints_execute(self, joints_angle):
+        '''
+        Execute the trajectory to go to the desired joints angle
+        
+        '''
         
         # We can get the joint values from the group and adjust some of the values:
-        joint_goal = self.group.get_current_joint_values()
-        for i in range(0,6):
-            joint_goal[i] = joints_angle[i]
+        # print(self.group.get_current_joint_values())
+        # joint_goal = self.group.get_current_joint_values()
+        # for i in range(0,6):
+        #     joint_goal[i] = joints_angle[i]
 
+
+        # self.group.set_joint_value_target(joint_goal)
+        self.group.set_joint_value_target(joints_angle)
         # The go command can be called with joint values, poses, or without any
         # parameters if you have already set the pose or joint target for the group
-        result = self.group.go(joint_goal, wait=True)
-
+        # result = self.group.go(joint_goal, wait=True) #BEFORE
+        self.plan = self.group.plan()
+        result = self.group.go(wait=True)
+        # result = self.group.go(joints_angle, wait=True)
+        rospy.sleep(2.0)
+        # rospy.sleep(5.0)
         # Calling ``stop()`` ensures that there is no residual movement
-        self.group.stop()
+        # self.group.stop()
+        # self.group.clear_pose_targets()
+        # self.group.forget_joint_values()
 
         return result
 
     def set_endEffector_pose(self, pose):
         self.group.set_pose_target(pose)
-        result = self.execute_trajectory()
+        result = self.execute_trajectory_v2()
 
         return result
 
@@ -401,11 +546,11 @@ class MoveIiwa(object):
         #     print("execute_trajectory(): result: ", result)
 
         # rospy.sleep(self.group.get_planning_time())
-        
-        # self.group.stop()
+        rospy.sleep(0.001)
+        self.group.stop()
         # It is always good to clear your targets after planning with poses.
         # Note: there is no equivalent function for clear_joint_value_targets()
-        # self.group.clear_pose_targets()
+        self.group.clear_pose_targets()
         
         return result
     
@@ -420,17 +565,35 @@ class MoveIiwa(object):
 
         return endEffector_pose
 
-        # TRY TWO
+    def get_joint(self):
+        current_joint = self.group.get_current_joint_values()
+        return current_joint
+
+    # TRY TWO
+    # Plan and Execute the trajectory planed for a given cartesian pose
     def set_endEffector_pose_v2(self, pose):
+        '''
+        Send to the "controller" the positions (trajectory) where it want to go
+        '''
         # self.group.shift_pose_target(5, action)
         self.group.set_pose_target(pose)
         # result = self.execute_trajectory()
+        # self.plan = self.group.plan()
+        # result =  self.group.execute(self.plan, wait=True)
+
+        # Try:
+
         self.plan = self.group.plan()
-        result =  self.group.execute(self.plan, wait=True)
-        rospy.sleep(0.05)
+        result = self.group.go(wait=True)
+
+        # rospy.sleep(0.05)
         # print("in iiwa_env.py: class: MoveIiwa ")
         # print("execute_trajectory(): result: ", result)
-
-        
+        # self.group.stop()
+        # It is always good to clear your targets after planning with poses.
+        # Note: there is no equivalent function for clear_joint_value_targets()
+        # self.group.clear_pose_targets()
 
         return result
+
+  

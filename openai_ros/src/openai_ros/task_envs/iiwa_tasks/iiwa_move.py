@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 
 # Task iiwa environment. Create the world and the action
 
@@ -45,6 +45,20 @@ class iiwaMoveEnv(iiwa_env.iiwaEnv):
 
         # Variables of the class
         self.cumulated_reward = 0.0
+        
+        # For GYM
+        # Action space
+        # +x, -x, +y, -y, +z. z 
+        self.n_actions = 6
+        self.action_space = spaces.Discrete(self.n_actions)
+        # self.action_space = spaces.multi_discrete([5, 2, 2])
+
+        # Observations space
+        low = np.array([-0.8, -0.8, 0.0, 0.0, 0.0, 0.0, 0.0])
+        # quat of (6.28, 6.28, 6.28) => (0.99534, 0.05761, 0.05761, 0.05162)
+        high = np.array([0.8, 0.8, 1.266, 1.0, 1.0, 1.0, 1.0])
+        self.observation_space = spaces.Box(low, high, dtype=np.float32)
+
 
         # TARGET
         target_x = 0.5#0.0#0.5
@@ -79,10 +93,11 @@ class iiwaMoveEnv(iiwa_env.iiwaEnv):
         and lands the robot. Its preparing it to be reseted in the world.
         """
         rospy.logdebug("Start Set Initi Joints")
-        joints_array = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        joints_array = [0.0, 0.0, 0.0, -1.57, 0.0, 1.57, 0.0]
         rospy.logdebug("Set Init Joints ==> " + str(joints_array))
         result = self.set_joint_action(joints_array)
         rospy.logdebug("Set Init Joints Works!")
+        # rospy.sleep(3.0)
         return result
 
     def _init_env_variables(self):
@@ -92,7 +107,6 @@ class iiwaMoveEnv(iiwa_env.iiwaEnv):
         :return:
         """
 
-        # For Info Purposes
         self.cumulated_reward = 0.0
         self.last_pose = self.get_endEffector_Object()
         self.current_pose = self.get_endEffector_Object()
@@ -120,16 +134,18 @@ class iiwaMoveEnv(iiwa_env.iiwaEnv):
         kuka_pose.append(action[4])
         kuka_pose.append(action[5])
 
-        print(kuka_pose)
+        # print(kuka_pose)
         self.movement_result = self.set_endEffector_acttionToPose(kuka_pose)
-        if self.movement_result == False:
-            print("*******************************************************")
-            print("COULD NOT MOVE")
-            print("*******************************************************")
-        else:
-            print("*******************************************************")
-            print("COULD MOVED")
-            print("*******************************************************")
+        # self.movement_result = self.set_endEffector_pose(kuka_pose)
+        
+        # if self.movement_result == False:
+        #     print("*******************************************************")
+        #     print("COULD NOT MOVE")
+        #     print("*******************************************************")
+        # else:
+        #     print("*******************************************************")
+        #     print("COULD MOVED")
+        #     print("*******************************************************")
 
         
 
@@ -193,7 +209,7 @@ class iiwaMoveEnv(iiwa_env.iiwaEnv):
         """
         
         """
-
+        
         # The sign depend on its function.
         total_reward = 0
         
@@ -214,18 +230,21 @@ class iiwaMoveEnv(iiwa_env.iiwaEnv):
         distance_after_move = self.distance_between_vectors(current_position, self.target_position)
 
         # Give the reward
-        if done:
-            total_reward += 100
+        if self.out_workspace:
+            total_reward -=20
         else:
-            if(distance_after_move - distance_before_move > 0):
-                print("right direction")
-                total_reward += 1.0
+            if done:
+                total_reward += 100
             else:
-                print("wrong direction")
-                total_reward -= 0.5
+                if(distance_after_move - distance_before_move > 0):
+                    # print("right direction")
+                    total_reward += 2.0
+                else:
+                    print("wrong direction")
+                    # total_reward -= +1.0
 
         # Time punishment
-        total_reward -= 0.5
+        total_reward -= 1.0
 
 
         rospy.logdebug("###############")
@@ -245,3 +264,6 @@ class iiwaMoveEnv(iiwa_env.iiwaEnv):
     
     def calculate_reward(self):
         print("Albus")
+
+    # def check_workplace():
+    #     print("Check workplace")

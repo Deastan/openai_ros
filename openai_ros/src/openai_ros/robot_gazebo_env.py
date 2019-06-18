@@ -46,10 +46,11 @@ class RobotGazeboEnv(gym.Env):
         
         self.gazebo.unpauseSim()
         self._set_action(action)
+        # sel
         # print("I am waiting 3.0s")
         # rospy.sleep(3.0)
         # print("I have finished to wait 3.0s")
-        self.gazebo.pauseSim()
+        # self.gazebo.pauseSim()
         obs = self._get_obs()
         done = self._is_done(obs)
         info = {}
@@ -64,6 +65,7 @@ class RobotGazeboEnv(gym.Env):
         rospy.logdebug("Reseting RobotGazeboEnvironment")
         self._reset_sim()
         self._init_env_variables()
+        rospy.sleep(3.0)
         self._update_episode()
         obs = self._get_obs()
         rospy.logdebug("END Reseting RobotGazeboEnvironment")

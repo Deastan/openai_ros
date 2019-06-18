@@ -122,21 +122,6 @@ class FetchEnv(robot_gazebo_env.RobotGazeboEnv):
 
         return result
 
-    def set_trajectory_joints(self, initial_qpos):
-
-        positions_array = [None] * 7
-        positions_array[0] = initial_qpos["joint0"]
-        positions_array[1] = initial_qpos["joint1"]
-        positions_array[2] = initial_qpos["joint2"]
-        positions_array[3] = initial_qpos["joint3"]
-        positions_array[4] = initial_qpos["joint4"]
-        positions_array[5] = initial_qpos["joint5"]
-        positions_array[6] = initial_qpos["joint6"]
-
-        self.move_fetch_object.joint_traj(positions_array)
-
-        return True
-
     def create_action(self, position, orientation):
         """
         position = [x,y,z]
