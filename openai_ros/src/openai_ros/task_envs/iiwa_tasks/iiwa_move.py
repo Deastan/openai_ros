@@ -49,7 +49,8 @@ class iiwaMoveEnv(iiwa_env.iiwaEnv):
         # For GYM
         # Action space
         # +x, -x, +y, -y, +z. z 
-        self.n_actions = 6
+        # self.n_actions = 6 # real one
+        self.n_actions = 4
         self.action_space = spaces.Discrete(self.n_actions)
         # self.action_space = spaces.multi_discrete([5, 2, 2])
 
@@ -62,7 +63,7 @@ class iiwaMoveEnv(iiwa_env.iiwaEnv):
 
         # TARGET
         target_x = 0.5#0.0#0.5
-        target_y = 0.5#0.5
+        target_y = -0.5#0.5
         target_z = 0.25#0.5
         self.target_position = []
         self.target_position.append(target_x)
@@ -103,9 +104,9 @@ class iiwaMoveEnv(iiwa_env.iiwaEnv):
         # Init pose using cartesian
         # self.movement_result = self.set_endEffector_pose(kuka_pose)
         # Kuka pose is: kuka_pose [0.5, 0.0, 0.25, 3.14, 0.0, 0.0]
-        kuka_pose = [0.5, 0.5, 0.25, 3.14, 0.0, 0.0]
+        kuka_pose = [0.5, 0.5, 0.35, 3.14, 0.0, 0.0]
         rospy.logdebug("Set Init Cartesian Pose ==> " + str(kuka_pose))
-        self.movement_result = self.set_endEffector_pose(kuka_pose)
+        result = self.set_endEffector_pose(kuka_pose)
 
         rospy.logdebug("Set Init Joints Works!")
         # rospy.sleep(3.0)
@@ -145,9 +146,10 @@ class iiwaMoveEnv(iiwa_env.iiwaEnv):
         kuka_pose.append(action[4])
         kuka_pose.append(action[5])
 
-        # print(kuka_pose)
-        # self.movement_result = self.set_endEffector_acttionToPose(kuka_pose)
-        self.movement_result = self.set_endEffector_pose(kuka_pose)
+        # if we want to do a certain action
+        self.movement_result = self.set_endEffector_acttionToPose(kuka_pose)
+        # if we want to go to a certain position
+        # self.movement_result = self.set_endEffector_pose(kuka_pose)
         
         # if self.movement_result == False:
         #     print("*******************************************************")

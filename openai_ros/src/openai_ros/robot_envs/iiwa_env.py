@@ -316,7 +316,7 @@ class iiwaEnv(robot_gazebo_env.RobotGazeboEnv):
         pose_goal.orientation.y = q_rot[1]
         pose_goal.orientation.z = q_rot[2]
         pose_goal.orientation.w = q_rot[3]
-        print(pose_goal)
+        # print(pose_goal)
         #check if point is in the workspace:
         bool_check_workspace = self.check_workspace(pose_goal)
         if bool_check_workspace == True:
