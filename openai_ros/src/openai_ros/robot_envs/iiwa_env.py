@@ -227,7 +227,8 @@ class iiwaEnv(robot_gazebo_env.RobotGazeboEnv):
         # Sphere parameters:
         z0 = 0.34
         offset_ee = 0.13
-        offset_z = 0.25
+        # offset_z = 0.25
+        offset_z = 0.05 # for testing the hands
         # print("Before check point")
         # print("Calculation: ", ((x*x + y*y + (z-z0)*(z-z0)) < (0.8+offset_ee)*(0.8+offset_ee)))
         if (((x*x + y*y + (z-z0)*(z-z0)) < (0.8+offset_ee)*(0.8+offset_ee)) 
@@ -514,7 +515,7 @@ class MoveIiwa(object):
         self.plan = self.group.plan()
         result = self.group.go(wait=True)
         # result = self.group.go(joints_angle, wait=True)
-        rospy.sleep(2.0)
+        # rospy.sleep(2.0)
         # rospy.sleep(5.0)
         # Calling ``stop()`` ensures that there is no residual movement
         # self.group.stop()
@@ -546,7 +547,7 @@ class MoveIiwa(object):
         #     print("execute_trajectory(): result: ", result)
 
         # rospy.sleep(self.group.get_planning_time())
-        rospy.sleep(0.001)
+        # rospy.sleep(0.001)
         self.group.stop()
         # It is always good to clear your targets after planning with poses.
         # Note: there is no equivalent function for clear_joint_value_targets()

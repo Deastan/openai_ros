@@ -63,7 +63,7 @@ class iiwaMoveEnv(iiwa_env.iiwaEnv):
         # TARGET
         target_x = 0.5#0.0#0.5
         target_y = 0.5#0.5
-        target_z = 0.5#0.5
+        target_z = 0.25#0.5
         self.target_position = []
         self.target_position.append(target_x)
         self.target_position.append(target_y)
@@ -93,9 +93,20 @@ class iiwaMoveEnv(iiwa_env.iiwaEnv):
         and lands the robot. Its preparing it to be reseted in the world.
         """
         rospy.logdebug("Start Set Initi Joints")
-        joints_array = [0.0, 0.0, 0.0, -1.57, 0.0, 1.57, 0.0]
-        rospy.logdebug("Set Init Joints ==> " + str(joints_array))
-        result = self.set_joint_action(joints_array)
+
+        # Init pose using joint angle
+        # joints_array = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]    
+        # joints_array = [0.0, 0.0, 0.0, -1.57, 0.0, 1.57, 0.0]
+        # rospy.logdebug("Set Init Joints ==> " + str(joints_array))
+        # result = self.set_joint_action(joints_array)
+
+        # Init pose using cartesian
+        # self.movement_result = self.set_endEffector_pose(kuka_pose)
+        # Kuka pose is: kuka_pose [0.5, 0.0, 0.25, 3.14, 0.0, 0.0]
+        kuka_pose = [0.5, 0.5, 0.25, 3.14, 0.0, 0.0]
+        rospy.logdebug("Set Init Cartesian Pose ==> " + str(kuka_pose))
+        self.movement_result = self.set_endEffector_pose(kuka_pose)
+
         rospy.logdebug("Set Init Joints Works!")
         # rospy.sleep(3.0)
         return result
@@ -135,8 +146,8 @@ class iiwaMoveEnv(iiwa_env.iiwaEnv):
         kuka_pose.append(action[5])
 
         # print(kuka_pose)
-        self.movement_result = self.set_endEffector_acttionToPose(kuka_pose)
-        # self.movement_result = self.set_endEffector_pose(kuka_pose)
+        # self.movement_result = self.set_endEffector_acttionToPose(kuka_pose)
+        self.movement_result = self.set_endEffector_pose(kuka_pose)
         
         # if self.movement_result == False:
         #     print("*******************************************************")
@@ -200,7 +211,7 @@ class iiwaMoveEnv(iiwa_env.iiwaEnv):
         vector_observ_pose.append(observations[2])
 
         # Check if the hand effector is close to the target in cm!
-        if self.distance_between_vectors(vector_observ_pose, self.target_position) < 0.03:
+        if self.distance_between_vectors(vector_observ_pose, self.target_position) < 0.2:
             done = True
 
         return done
@@ -231,7 +242,7 @@ class iiwaMoveEnv(iiwa_env.iiwaEnv):
 
         # Give the reward
         if self.out_workspace:
-            total_reward -=20
+            total_reward -= 20
         else:
             if done:
                 total_reward += 100
@@ -240,8 +251,8 @@ class iiwaMoveEnv(iiwa_env.iiwaEnv):
                     # print("right direction")
                     total_reward += 2.0
                 else:
-                    print("wrong direction")
-                    # total_reward -= +1.0
+                    # print("wrong direction")
+                    total_reward -= 1.0
 
         # Time punishment
         total_reward -= 1.0
