@@ -27,6 +27,7 @@ class iiwaMoveEnv(iiwa_env.iiwaEnv):
         # Set the package, launch file we need 
         ros_ws_abspath = "/home/roboticlab14/catkin_ws/"
         rospackage_name="iiwa_gazebo"
+        # launch_file_name="start_world.launch"
         launch_file_name="start_world.launch"
 
         # Prepare the path to run the launchfile
@@ -126,7 +127,8 @@ class iiwaMoveEnv(iiwa_env.iiwaEnv):
     # The action here are the delta for the 6 first row
     # The delta position are in m
     # The angle are in Euler in rad 
-    # action = [ x, y, z, R, P, Y ]
+    # action = [ x, y, z, R, P, Y ] FALSE
+    # action = [x, -x, y, -y, z, -z]
     def _set_action(self, action):
         """
         It sets the joints of monoped based on the action integer given
@@ -213,7 +215,7 @@ class iiwaMoveEnv(iiwa_env.iiwaEnv):
         vector_observ_pose.append(observations[2])
 
         # Check if the hand effector is close to the target in cm!
-        if self.distance_between_vectors(vector_observ_pose, self.target_position) < 0.2:
+        if self.distance_between_vectors(vector_observ_pose, self.target_position) < 0.1:
             done = True
 
         return done

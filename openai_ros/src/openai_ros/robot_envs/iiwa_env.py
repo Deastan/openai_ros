@@ -7,7 +7,8 @@ import git
 import copy
 import sys
 import time
-
+import math as math
+from math import pi
 from openai_ros import robot_gazebo_env
 # from openai_ros.openai_ros_common import ROSLauncher
 
@@ -76,7 +77,8 @@ class iiwaEnv(robot_gazebo_env.RobotGazeboEnv):
 
         if choice == 1:
             rospackage_name="iiwa_gazebo"
-            launch_file_name="put_iiwa_in_world.launch"
+            # launch_file_name="put_iiwa_in_world.launch"
+            launch_file_name="put_iiwa_in_world_debug.launch"
             pkg_string = "/home/roboticlab14/catkin_ws/src/iiwa_stack/iiwa_gazebo"
         
         elif choice == 2: 
@@ -102,16 +104,17 @@ class iiwaEnv(robot_gazebo_env.RobotGazeboEnv):
 
         # Internal Vars
         self.controllers_list = [
+            'joint_state_controller', 
             'PositionJointInterface_trajectory_controller',
-            'joint_state_controller',
-            'preshape_1_position_controller',
-            'preshape_2_position_controller',
-            'proximal_joint_1_position_controller',
-            'proximal_joint_2_position_controller',
-            'proximal_joint_3_position_controller',
-            'distal_joint_1_position_controller',
-            'distal_joint_2_position_controller',
-            'distal_joint_3_position_controller',
+            # 'joint_state_controller',
+            # 'preshape_1_position_controller',
+            # 'preshape_2_position_controller',
+            # 'proximal_joint_1_position_controller',
+            # 'proximal_joint_2_position_controller',
+            # 'proximal_joint_3_position_controller',
+            # 'distal_joint_1_position_controller',
+            # 'distal_joint_2_position_controller',
+            # 'distal_joint_3_position_controller',
             ]
         # print(self.controllers_list)
 
@@ -169,8 +172,8 @@ class iiwaEnv(robot_gazebo_env.RobotGazeboEnv):
         # Suscriber iiwa
         # We use it to get the joints positions and calculate the reward associated to it
         # rospy.Subscriber("/iiwa/joint_states", JointState,
-        #                  self._joints_state_callback)
-
+        #                   self._joints_state_callback)
+        self.step_circle = 0
         # rospy.sleep(20)
         # Create instance for moveIt
         self.moveit_object = MoveIiwa()
@@ -246,42 +249,61 @@ class iiwaEnv(robot_gazebo_env.RobotGazeboEnv):
         Vector action is the delta position (m) and angle (rad)
         (x, y, z, R, P, Y)    
         '''
-        
+        # defining a height that the robot should stay!
+        constant_z = 0.35
+
         # Current pose of the hand effector
         current_pose = geometry_msgs.msg.Pose()
         current_pose = self.moveit_object.get_endEffector_pose().pose
         # print("***************************************************")
         # print("current orientation")
         # print(current_pose.orientation)
-        q_interm = quaternion_from_euler(action[3], action[4], action[5])
-        q_interm[0] = current_pose.orientation.x
-        q_interm[1] = current_pose.orientation.y
-        q_interm[2] = current_pose.orientation.z
-        q_interm[3] = current_pose.orientation.w
+
+        # Normal way
+        # q_interm = quaternion_from_euler(action[3], action[4], action[5])
+        # q_interm[0] = current_pose.orientation.x
+        # q_interm[1] = current_pose.orientation.y
+        # q_interm[2] = current_pose.orientation.z
+        # q_interm[3] = current_pose.orientation.w
+        # Fix way
+        q_interm = quaternion_from_euler(3.1457, 0.0, 0.0)
+        # q_interm[0] = current_pose.orientation.x
+        # q_interm[1] = current_pose.orientation.y
+        # q_interm[2] = current_pose.orientation.z
+        # q_interm[3] = current_pose.orientation.w
         # print("current q_interm")
         # print(q_interm)
 
         # print("***************************************************")
         # euler to quaternion 
         # R, P, Y = action[3], action[4], action[5]
-        q_rot = quaternion_from_euler(action[3], action[4], action[5])
+        # q_rot = quaternion_from_euler(action[3], action[4], action[5])
         # print("***************************************************")
         # print("desired rotation")
         # print(q_rot)
         # print("***************************************************")
+  
 
         # create pose msg
         pose_goal = geometry_msgs.msg.Pose()
         pose_goal.position.x = current_pose.position.x + action[0]
         pose_goal.position.y = current_pose.position.y + action[1]
-        pose_goal.position.z = current_pose.position.z + action[2]
-        q_interm = quaternion_multiply(q_rot, q_interm)
-        pose_goal.orientation.x = q_interm[0]
-        pose_goal.orientation.y = q_interm[1]
-        pose_goal.orientation.z = q_interm[2]
-        pose_goal.orientation.w = q_interm[3]
+        pose_goal.position.z = constant_z#current_pose.position.z + action[2]
+        # q_interm = quaternion_multiply(q_rot, q_interm)
+        # pose_goal.orientation.x = q_interm[0]
+        # pose_goal.orientation.y = q_interm[1]
+        # pose_goal.orientation.z = q_interm[2]
+        # pose_goal.orientation.w = q_interm[3]
         # pose_goal.orientation =  q_mult(q_rot, current_pose.orientation)
         
+        #***************************************************************************************************
+        # WARNING SHORTCUT!!!
+        pose_goal.orientation.w = 1.0
+        pose_goal.position.x = 0.7*math.cos(self.step_circle)
+        pose_goal.position.y = 0.7*math.sin(self.step_circle)
+        pose_goal.position.z = 0.7#current_pose.position.z + action[2]
+        self.step_circle +=0.078539816339#0.1
+        #***************************************************************************************************
 
         # Check if point is in the workspace:
         bool_check_workspace = self.check_workspace(pose_goal)
@@ -464,17 +486,18 @@ class MoveIiwa(object):
         self.group.set_planner_id("RRTkConfigDefault")
         # self.group.set_planner_id("RRTConnectkConfigDefault")
         
-        self.group.set_planning_time(5.0)
-        self.group.allow_replanning(True)
+        # self.group.set_planning_time(2.0)
+        # self.group.allow_replanning(True)
         # Set a box arround the robot
         # self.group.set_workspace([-1.0, -1.0, 0.0, 1.0, 1.0, 1.27])
-        
+        # self.group.set_goal_joint_tolerance(0.01)
         # self.group.set_planner_id("RRTConnectkConfigDefault")
-        self.group.set_goal_tolerance(0.05)
+        # self.group.set_goal_tolerance(0.01)
+        # self.group.set
         # self.group.set_num_planning_attempts(15) # USEFUL to calculate many trajectories calculation
         # self.group.set_planning_time(5.0)
-        self.group.set_max_velocity_scaling_factor(1.0)#0.8)#1.0)
-        self.group.set_max_acceleration_scaling_factor(1.0)#0.8)#1.0)
+        # self.group.set_max_velocity_scaling_factor(1.0)#0.8)#1.0)
+        # self.group.set_max_acceleration_scaling_factor(1.0)#0.8)#1.0)
         
         # #GET INFO
         # planning_frame = self.group.get_planning_frame()
@@ -581,11 +604,16 @@ class MoveIiwa(object):
         # result = self.execute_trajectory()
         # self.plan = self.group.plan()
         # result =  self.group.execute(self.plan, wait=True)
-
+        
         # Try:
-
-        self.plan = self.group.plan()
+        # print(pose.position.z)
+        # self.plan = self.group.plan()
         result = self.group.go(wait=True)
+
+        self.group.stop()
+        # It is always good to clear your targets after planning with poses.
+        # Note: there is no equivalent function for clear_joint_value_targets()
+        self.group.clear_pose_targets()
 
         # rospy.sleep(0.05)
         # print("in iiwa_env.py: class: MoveIiwa ")
